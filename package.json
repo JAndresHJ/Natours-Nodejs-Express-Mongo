@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "npx nodemon"
+    "start": "npx nodemon",
+		"start:prod": "SET NODE_ENV=production&& npx nodemon",
+    "debug": "ndb server.ts"
   },
   "author": "Andrés Hernández",
   "license": "ISC",
