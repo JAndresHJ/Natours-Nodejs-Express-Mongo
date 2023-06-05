@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import Tour from '../models/tourModel';
+import APIFeatures from '../utils/apiFeatures';
 
 export const aliasTopTours = async (
   req: Request,
@@ -16,53 +17,14 @@ export const aliasTopTours = async (
 // Route Handlers
 export const getAllTours = async (req: Request, res: Response) => {
   try {
-    // BUILD QUERY
-    const queryObj = { ...req.query };
-    const excludedFields = ['page', 'sort', 'limit', 'fields'];
-    excludedFields.forEach((field) => delete queryObj[field]);
-
-    // 1) ADVANCED FILTERING
-    // { difficulty: 'easy', duration: { gte: 5 } }
-    let queryStr = JSON.stringify(queryObj);
-    queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
-
-    let query = Tour.find(JSON.parse(queryStr));
-
-    // 2) SORTING
-    if (req.query.sort) {
-      const sortBy = (req.query.sort as string).split(',').join(' ');
-      query = query.sort(sortBy);
-    } else {
-      query = query.sort('-createdAt');
-    }
-
-    // 3) FIELD LIMITING
-    if (req.query.fields) {
-      const fields = (req.query.fields as string).split(',').join(' ');
-      // Select expects an argument in the form of fields separated with a space
-      // Example: 'name description createdAt'
-      query = query.select(fields);
-    } else {
-      // By adding a '-' the field will be excluded in from the response.
-      query = query.select('-__v');
-    }
-
-    const { page, limit } = req.query;
-
-    // 4) PAGINATION
-    const pageQuery = page ? Number(page) : 1;
-    const limitQuery = limit ? Number(limit) : 1;
-    const skip = (pageQuery - 1) * limitQuery;
-    // page=2&limit=10 page-1: 1-10, page-2: 11-20
-    query = query.skip(skip).limit(limitQuery);
-
-    if (page) {
-      const numOfTours = await Tour.countDocuments();
-      if (skip >= numOfTours) throw new Error('This page does not exits');
-    }
-
     // EXECUTE QUERY
-    const tours = await query;
+    const features = new APIFeatures(Tour.find(), req.query)
+      .filter()
+      .sort()
+      .limitFields()
+      .paginate();
+
+    const tours = await features.query;
     /*     const tours = await Tour.find()
       .where('duration')
       .equals(5)
@@ -159,6 +121,106 @@ export const deleteTour = async (req: Request, res: Response) => {
       data: null,
     });
   } catch (error) {
+    res.status(400).json({
+      status: 'Failed',
+      message: error,
+    });
+  }
+};
+
+export const getTourStats = async (req: Request, res: Response) => {
+  try {
+    const stats = await Tour.aggregate([
+      { $match: { ratingsAverage: { $gte: 4.5 } } },
+      {
+        $group: {
+          _id: { $toUpper: '$difficulty' },
+          numRatings: { $sum: '$ratingsQuantity' },
+          numTours: { $sum: 1 },
+          averageRating: { $avg: '$ratingsAverage' },
+          avgPrice: { $avg: '$price' },
+          minPrice: { $min: '$price' },
+          maxPrice: { $max: '$price' },
+        },
+      },
+      {
+        // You need to use the key from the group stage: 'avgPrice'. 1 means sort by ascending
+        $sort: { avgPrice: 1 },
+      },
+      // We can repeat stages. At this point the _id is the difficulty.
+      // { $match: { _id: { $ne: 'EASY' } } },
+    ]);
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        stats,
+      },
+    });
+  } catch (error) {
+    res.status(400).json({
+      status: 'Failed',
+      message: error,
+    });
+  }
+};
+
+export const getMonthlyPlan = async (req: Request, res: Response) => {
+  try {
+    const { year } = req.params; // 2021
+    const plan = await Tour.aggregate([
+      // Deconstructs an array field from the input documents and outputs
+      // one documnet for each element of the array.
+      { $unwind: '$startDates' },
+      // Match Stage
+      {
+        $match: {
+          startDates: {
+            $gte: new Date(`${year}-01-01`), // Between the first day of the year
+            $lte: new Date(`${year}-12-31`), // and the last day of the current year
+          },
+        },
+      },
+      // Group stage
+      {
+        $group: {
+          _id: { $month: '$startDates' },
+          numTourStarts: { $sum: 1 },
+          tours: { $push: '$name' },
+        },
+      },
+      // Add Field Stage
+      {
+        $addFields: {
+          month: '$_id',
+        },
+      },
+      // Project Stage. Give each field a 0 or 1 to hide or show field, repectively
+      {
+        $project: {
+          _id: 0,
+        },
+      },
+      // Sort Stage
+      {
+        $sort: {
+          numTourStarts: -1, // Sorting in descending order
+        },
+      },
+      // Limit Stage
+      {
+        $limit: 12,
+      },
+    ]);
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        plan,
+      },
+    });
+  } catch (error) {
+    console.log(error);
     res.status(400).json({
       status: 'Failed',
       message: error,

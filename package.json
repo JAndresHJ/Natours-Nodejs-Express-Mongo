@@ -16,6 +16,7 @@
     "express": "^4.18.2",
     "mongoose": "^7.2.0",
     "morgan": "^1.10.0",
+    "slugify": "^1.6.6",
     "typescript": "^5.0.4",
     "validator": "^13.9.0"
   },

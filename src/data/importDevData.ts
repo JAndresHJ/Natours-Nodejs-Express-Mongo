@@ -26,9 +26,8 @@ const importData = async () => {
     console.log('Data successfully loaded!');
   } catch (err) {
     console.log(err);
-  } finally {
-    process.exit();
   }
+  process.exit();
 };
 
 // DELETE ALL DATA FROM COLLECTION
@@ -37,13 +36,15 @@ const deleteData = async () => {
   try {
     // If no parameters are passed, it'll delete everything
     await Tour.deleteMany();
+    console.log('Data successfully deleted!');
   } catch (error) {
     console.log(error);
-  } finally {
-    process.exit();
   }
+  process.exit();
 };
 
+// Comand to import data:
+// 1- cd into the data folder and run the importDevData file with 'npx ts-node'.
 if (process.argv[2] === '--import') {
   importData();
 } else if (process.argv[2] === '--delete') {
