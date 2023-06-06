@@ -1,31 +1,27 @@
-import mongoose from 'mongoose';
+import mongoose, { Document, Model } from 'mongoose';
 import validator from 'validator';
 import bcrypt from 'bcryptjs';
-
-// name, email, photo, password, password confirm
-
 interface UserAttrs {
   name: string;
   email: string;
   photo?: string;
   password: string;
   passwordConfirm: string | undefined;
-}
-
-// An interface that describe properties
-// that a User Model has
-interface UserModel extends mongoose.Model<UserDoc> {
-  build(attrs: UserAttrs): UserDoc;
+  passwordChangedAt: Date;
+  role: 'user' | 'admin' | 'guide' | 'lead-guide';
 }
 
 // An interface that describes the properties
 // that a User Document has
-interface UserDoc extends mongoose.Document {
-  email: string;
-  password: string;
+interface UserDoc extends UserAttrs, Document {
+  verifyPassword: (
+    plainPassword: string,
+    hashedPassword: string
+  ) => Promise<boolean>;
+  changePasswordAfter: (JWTTimestamp: number) => boolean;
 }
 
-const userSchema = new mongoose.Schema<UserAttrs>({
+const userSchema = new mongoose.Schema<UserDoc>({
   name: {
     type: String,
     required: [true, 'User name is required'],
@@ -38,10 +34,16 @@ const userSchema = new mongoose.Schema<UserAttrs>({
     validate: [validator.isEmail, 'Please provide a valid email'],
   },
   photo: String,
+  role: {
+    type: String,
+    enum: ['user', 'guide', 'tour-guide', 'admin'],
+    default: 'user',
+  },
   password: {
     type: String,
     required: [true, 'Password is required'],
     minlength: 8,
+    select: false, // This property is used to define if this field will be part of the response
   },
   passwordConfirm: {
     type: String,
@@ -54,6 +56,7 @@ const userSchema = new mongoose.Schema<UserAttrs>({
       message: 'Passwords are not the same!',
     },
   },
+  passwordChangedAt: Date,
 });
 
 // Whener a user is inteded to be saved in mongo that save attempt
@@ -72,6 +75,28 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
-const User = mongoose.model<UserDoc, UserModel>('User', userSchema);
+userSchema.methods.verifyPassword = async function (
+  plainPassword: string,
+  hashedPassword: string
+) {
+  // this.password will be undefined since this field was marked with select = false on the schema
+  return await bcrypt.compare(plainPassword, hashedPassword);
+};
+
+userSchema.methods.changePasswordAfter = async function (
+  this: UserDoc,
+  JWTTimestamp: number
+) {
+  if (this.passwordChangedAt) {
+    const changeTimestamp = this.passwordChangedAt.getTime() / 1000;
+
+    return JWTTimestamp < changeTimestamp;
+  }
+
+  // FALSE means NOT changed
+  return false;
+};
+
+const User = mongoose.model<UserDoc>('User', userSchema);
 
 export default User;

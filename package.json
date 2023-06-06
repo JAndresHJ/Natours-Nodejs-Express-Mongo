@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "npx nodemon",
-		"start:prod": "SET NODE_ENV=production&& npx nodemon",
+    "start:prod": "SET NODE_ENV=production&& npx nodemon",
     "debug": "ndb server.ts"
   },
   "author": "Andrés Hernández",
@@ -16,6 +16,7 @@
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.0",
     "mongoose": "^7.2.0",
     "morgan": "^1.10.0",
     "slugify": "^1.6.6",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.2",
+    "@types/jsonwebtoken": "^9.0.2",
     "@types/morgan": "^1.9.4",
     "@types/node": "^20.1.1",
     "@types/validator": "^13.7.17",

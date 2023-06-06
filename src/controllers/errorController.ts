@@ -2,8 +2,19 @@ import { Request, Response, NextFunction } from 'express';
 import AppError, { CustomError } from '../utils/appError';
 import { CastError, Error } from 'mongoose';
 import { MongoError } from 'mongodb';
+import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 
-type ErrorJoin = CastError & CustomError & MongoError;
+type ErrorJoin = CastError &
+  CustomError &
+  MongoError &
+  JsonWebTokenError &
+  TokenExpiredError;
+
+const handleJWTError = () =>
+  new AppError('Invalid token. Please log in again!', 401);
+
+const handleJWTExpiredError = () =>
+  new AppError('Your token has expired! Log in again', 401);
 
 const handleCastErrorDB = (error: CastError) => {
   const message = `Invalid ${error.path}: ${error.value}`;
@@ -78,6 +89,14 @@ export const globalErrorHandler = (
     }
 
     const validationError = err as unknown as Error.ValidationError;
+
+    if (error.name === 'JsonWebTokenError') {
+      error = handleJWTError();
+    }
+
+    if (error.name === 'TokenExpiredErro') {
+      error = handleJWTExpiredError();
+    }
 
     if (validationError.name === 'ValidationError') {
       error = handleValidationErrorDB(validationError);

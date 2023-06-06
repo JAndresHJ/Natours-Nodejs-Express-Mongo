@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 
 interface MyCustomProperties {
   requestTime: string;
+  user: any;
 }
 
 declare global {

@@ -9,6 +9,7 @@ import {
   getTourStats,
   updateTour,
 } from '../controllers/tourController';
+import { isAuth, restrictTo } from '../controllers/authenticationController';
 
 const router = express.Router();
 
@@ -24,8 +25,12 @@ router.route('/monthly-plan/:year').get(getMonthlyPlan);
 // Run a middleware before reaching to the getAllTours controller
 // The middleware should populate the query string with the common values
 // sort=-ratingsAverage,price&limit=5
-router.route('/').get(getAllTours).post(createTour);
+router.route('/').get(isAuth, getAllTours).post(createTour);
 router.route('/top-5-tours').get(aliasTopTours, getAllTours);
-router.route('/:id').get(getTour).patch(updateTour).delete(deleteTour);
+router
+  .route('/:id')
+  .get(getTour)
+  .patch(updateTour)
+  .delete(isAuth, restrictTo('admin', 'lead-guide'), deleteTour);
 
 export { router as toursRouter };
