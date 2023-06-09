@@ -1,6 +1,7 @@
-import mongoose, { Document, Model } from 'mongoose';
+import mongoose, { Document, Query } from 'mongoose';
 import validator from 'validator';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 interface UserAttrs {
   name: string;
   email: string;
@@ -9,6 +10,9 @@ interface UserAttrs {
   passwordConfirm: string | undefined;
   passwordChangedAt: Date;
   role: 'user' | 'admin' | 'guide' | 'lead-guide';
+  passwordResetToken?: string;
+  passwordResetExpires?: Number;
+  active: boolean;
 }
 
 // An interface that describes the properties
@@ -19,6 +23,7 @@ interface UserDoc extends UserAttrs, Document {
     hashedPassword: string
   ) => Promise<boolean>;
   changePasswordAfter: (JWTTimestamp: number) => boolean;
+  createPasswordResetToken: () => string;
 }
 
 const userSchema = new mongoose.Schema<UserDoc>({
@@ -51,12 +56,20 @@ const userSchema = new mongoose.Schema<UserDoc>({
     validate: {
       // This only works on CREATE and SAVE!
       validator: function (this: UserAttrs, el: string): boolean {
+        console.log({ el }, this.password);
         return el === this.password;
       },
       message: 'Passwords are not the same!',
     },
   },
   passwordChangedAt: Date,
+  passwordResetToken: String,
+  passwordResetExpires: Number,
+  active: {
+    type: Boolean,
+    default: true,
+    select: false,
+  },
 });
 
 // Whener a user is inteded to be saved in mongo that save attempt
@@ -75,6 +88,18 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
+userSchema.pre<Query<UserAttrs, UserDoc>>(/^find/, function (next) {
+  this.find({ active: { $ne: false } });
+  next();
+});
+
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password') || this.isNew) return next();
+
+  this.passwordChangedAt = new Date(Date.now() - 1000);
+  next();
+});
+
 userSchema.methods.verifyPassword = async function (
   plainPassword: string,
   hashedPassword: string
@@ -83,7 +108,7 @@ userSchema.methods.verifyPassword = async function (
   return await bcrypt.compare(plainPassword, hashedPassword);
 };
 
-userSchema.methods.changePasswordAfter = async function (
+userSchema.methods.changePasswordAfter = function (
   this: UserDoc,
   JWTTimestamp: number
 ) {
@@ -95,6 +120,19 @@ userSchema.methods.changePasswordAfter = async function (
 
   // FALSE means NOT changed
   return false;
+};
+
+userSchema.methods.createPasswordResetToken = function (this: UserDoc) {
+  const resetToken = crypto.randomBytes(32).toString('hex');
+
+  this.passwordResetToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+
+  this.passwordResetExpires = Date.now() + 10 * 60 * 1000;
+
+  return resetToken;
 };
 
 const User = mongoose.model<UserDoc>('User', userSchema);

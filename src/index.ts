@@ -1,19 +1,64 @@
 import express, { NextFunction, Request, Response } from 'express';
 import { toursRouter } from './routes/tourRoutes';
 import { userRouter } from './routes/userRoutes';
-
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
+import mongoSanitize from 'express-mongo-sanitize';
+// import xss from 'xss-clean'
 import morgan from 'morgan';
-
 import { addTimeToReq, customMiddleware } from './middleware/custom-middleware';
 import AppError from './utils/appError';
 import { globalErrorHandler } from './controllers/errorController';
+import hpp from 'hpp';
 
 const app = express();
 
-// MIDDLEWARES
-app.use(morgan('dev'));
-app.use(express.json());
+// GLOBAL MIDDLEWARES
+// Set security HTTP headers. Should be at the beginning
+app.use(helmet());
+
+// Development logging
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+}
+
+// Limit requests from same API to prevent brute force attacks and DoS
+const limiter = rateLimit({
+  max: 100,
+  windowMs: 60 * 60 * 1000, // 100 requets per 1 hour is the limit
+  message: 'Too many requests from this IP, please try again in an hour!',
+});
+app.use('/api', limiter);
+
+// Body parser, reading data from body into req.body
+// Limits the size of the body to 10kb
+app.use(express.json({ limit: '10kb' }));
+
+// Data sanitization against NoSQL query injection
+app.use(mongoSanitize());
+
+// Data sanitization against XSS
+// app.use(xss());
+
+// Prevent parameter pollution
+//
+app.use(
+  hpp({
+    whitelist: [
+      'duration',
+      'ratingsQuantity',
+      'ratingsAverage',
+      'maxGroupSize',
+      'difficulty',
+      'price',
+    ],
+  })
+);
+
+// Serving static files
 app.use(express.static(`${__dirname}/public`));
+
+// Test middleware
 app.use(customMiddleware);
 app.use(addTimeToReq);
 
