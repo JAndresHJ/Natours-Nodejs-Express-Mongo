@@ -56,7 +56,6 @@ const userSchema = new mongoose.Schema<UserDoc>({
     validate: {
       // This only works on CREATE and SAVE!
       validator: function (this: UserAttrs, el: string): boolean {
-        console.log({ el }, this.password);
         return el === this.password;
       },
       message: 'Passwords are not the same!',

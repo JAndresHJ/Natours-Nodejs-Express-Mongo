@@ -2,8 +2,8 @@ import { NextFunction, Request, Response } from 'express';
 import Tour from '../models/tourModel';
 import APIFeatures from '../utils/apiFeatures';
 import { catchAsync } from '../utils/catchAsync';
-import { nextTick } from 'process';
 import AppError from '../utils/appError';
+import factory from './handlerFactory';
 
 export const aliasTopTours = async (
   req: Request,
@@ -46,7 +46,7 @@ export const getAllTours = catchAsync(async (req: Request, res: Response) => {
 export const getTour = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     const { id } = req.params;
-    const tour = await Tour.findById(id);
+    const tour = await Tour.findById(id).populate('reviews');
     // Tour.findOne({ _id: id }) it is the same like findBy()
 
     if (!tour) {
@@ -100,7 +100,9 @@ export const updateTour = catchAsync(
   }
 );
 
-export const deleteTour = catchAsync(
+export const deleteTour = factory.deleteOne(Tour);
+
+/* export const deleteTour = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     const tour = await Tour.findByIdAndDelete(req.params.id);
 
@@ -116,7 +118,7 @@ export const deleteTour = catchAsync(
       data: null,
     });
   }
-);
+); */
 
 export const getTourStats = catchAsync(async (req: Request, res: Response) => {
   const stats = await Tour.aggregate([

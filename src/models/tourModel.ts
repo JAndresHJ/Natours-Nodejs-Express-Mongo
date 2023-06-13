@@ -1,6 +1,13 @@
-import mongoose, { Aggregate, Document, Query } from 'mongoose';
+import mongoose, { Aggregate, Document, Query, Types, Schema } from 'mongoose';
 import slugify from 'slugify';
-import validator from 'validator';
+// import User from './userModel';
+
+interface Location {
+  type: string;
+  coordinates: number[];
+  address: string;
+  description: string;
+}
 
 interface TourAttrs {
   name: string;
@@ -19,6 +26,9 @@ interface TourAttrs {
   startDates: Date[];
   slug: string;
   secretTour: boolean;
+  startLocation: Location;
+  locations: { day: number & Location }[];
+  guides: Types.ObjectId[];
 }
 
 // An interface that describes the properties
@@ -28,7 +38,7 @@ interface TourDoc extends TourAttrs, Document {
   start: Date;
 }
 
-const toursSchema = new mongoose.Schema<TourAttrs>(
+const toursSchema = new Schema<TourDoc>(
   {
     name: {
       type: String,
@@ -106,6 +116,36 @@ const toursSchema = new mongoose.Schema<TourAttrs>(
       type: Boolean,
       default: false,
     },
+    startLocation: {
+      // GeoJSON
+      type: {
+        type: String,
+        default: 'Point',
+        enum: ['Point'],
+      },
+      coordinates: [Number],
+      address: String,
+      description: String,
+    },
+    locations: [
+      {
+        type: {
+          type: String,
+          default: 'Point',
+          enum: ['Point'],
+        },
+        coordinates: [Number],
+        address: String,
+        description: String,
+        day: Number,
+      },
+    ],
+    guides: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
   },
   {
     toJSON: {
@@ -127,18 +167,37 @@ toursSchema.virtual('durationWeeks').get(function () {
   return this.duration / 7;
 });
 
+// Virtual populate is useful when you do not want to persist a large
+// amout of reference ids but you still need to access like if it was
+// child referencing.
+toursSchema.virtual('reviews', {
+  ref: 'Review',
+  // Name in the other model (Review) where the reference to the current model is stored
+  foreignField: 'tour',
+  // Where the id is stored in this current model (Tour)
+  localField: '_id',
+});
+
 /**
- * Document Middleware: "pre" and "post" hooks operations. Functions
+ * DOCUMENT MIDDLEWARE: "pre" and "post" hooks operations. Functions
  * that run before or after certain event, like saving
  * a document to the DB.
  */
 
 // RUNS before the .save() and .create() but not on .insertMany()
 toursSchema.pre('save', function (next) {
-  console.log(this);
   this.slug = slugify(this.name, { lower: true });
   next();
 });
+
+/* 
+Embbeding guides into a Tour
+toursSchema.pre('save', async function (this: TourDoc, next) {
+  const guidesPromises = this.guides.map(async (id) => await User.findById(id));
+  this.guides = await Promise.all(guidesPromises);
+  next();
+});
+ */
 
 // Has access to the Doc that was save to the DB
 // Always call the next function.
@@ -152,6 +211,16 @@ toursSchema.post('save', function (doc, next) {
 // Use case: Hide some tours that could be exclusive
 toursSchema.pre<Query<TourAttrs, TourDoc>>(/^find/, function (next) {
   this.find({ secretTour: { $ne: true } });
+  next();
+});
+
+// Populate is used to fill a field that is being referenced with an ObjectId
+// Stills creates a new query so keep it in mind for any performance concern.
+toursSchema.pre<Query<TourAttrs, TourDoc>>(/^find/, function (next) {
+  this.populate({
+    path: 'guides',
+    select: '-__v -passwordChangeAt',
+  });
   next();
 });
 

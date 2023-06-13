@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import User from '../models/userModel';
 import { catchAsync } from '../utils/catchAsync';
 import AppError from '../utils/appError';
+import factory from './handlerFactory';
 
 const filterObj = (reqBody: Request['body'], ...allowedFields: string[]) => {
   const newObj: { [key: string]: string } = {};
@@ -105,9 +106,4 @@ export const updateUser = (req: Request, res: Response) => {
   });
 };
 
-export const deleteUser = (req: Request, res: Response) => {
-  res.status(500).json({
-    status: 'Error',
-    meesage: 'This route is not yet defined',
-  });
-};
+export const deleteUser = factory.deleteOne(User);

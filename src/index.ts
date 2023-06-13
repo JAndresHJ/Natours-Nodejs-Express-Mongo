@@ -1,6 +1,7 @@
 import express, { NextFunction, Request, Response } from 'express';
 import { toursRouter } from './routes/tourRoutes';
 import { userRouter } from './routes/userRoutes';
+import { reviewRouter } from './routes/reviewRoutes';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import mongoSanitize from 'express-mongo-sanitize';
@@ -65,6 +66,7 @@ app.use(addTimeToReq);
 // ROUTES
 app.use('/api/v1/tours', toursRouter);
 app.use('/api/v1/users', userRouter);
+app.use('/api/v1/reviews', reviewRouter);
 
 // Handling undefined routes. At this point
 // any route catched the URL that was send by the user

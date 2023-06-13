@@ -10,8 +10,13 @@ import {
   updateTour,
 } from '../controllers/tourController';
 import { isAuth, restrictTo } from '../controllers/authenticationController';
+import { createReview } from '../controllers/reviewController';
+import { reviewRouter } from './reviewRoutes';
 
 const router = express.Router();
+
+// NESTED ROUTES
+router.use('/:tourId/reviews', reviewRouter);
 
 // Use router.param to define middlewares that uses a parameter
 //router.param('id', checkID);

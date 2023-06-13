@@ -42,7 +42,7 @@ const createSendToken = (user: any, statusCode: number, res: Response) => {
 };
 
 export const signup = catchAsync(async (req: Request, res: Response) => {
-  const { name, email, password, passwordConfirm, passwordChangedAt } =
+  const { name, email, password, passwordConfirm, passwordChangedAt, role } =
     req.body;
   // Only use the needed properties for creating a user not the whole req.body
   const newUser = await User.create({
@@ -51,6 +51,7 @@ export const signup = catchAsync(async (req: Request, res: Response) => {
     password,
     passwordConfirm,
     passwordChangedAt,
+    role,
   });
   createSendToken(newUser, 201, res);
 });
