@@ -101,8 +101,6 @@ export const isAuth = catchAsync(
       process.env.JWT_SECRET as string
     );
 
-    console.log({ decoded });
-
     // 3) Check if user still exists
     const freshUser = await User.findById(decoded.id);
 

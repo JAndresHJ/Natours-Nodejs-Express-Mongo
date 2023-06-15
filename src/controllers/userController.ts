@@ -15,20 +15,6 @@ const filterObj = (reqBody: Request['body'], ...allowedFields: string[]) => {
   return newObj;
 };
 
-export const getAllUsers = catchAsync(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const users = await User.find();
-
-    res.status(200).json({
-      status: 'suceess',
-      results: users.length,
-      data: {
-        users,
-      },
-    });
-  }
-);
-
 export const updateMe = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     const { password, passwordConfirm } = req.body;
@@ -88,22 +74,20 @@ export const deleteMe = catchAsync(
 export const createUser = (req: Request, res: Response) => {
   res.status(500).json({
     status: 'Error',
-    meesage: 'This route is not yet defined',
+    meesage: 'This route is not yet defined, please use /signup instead',
   });
 };
 
-export const getUser = (req: Request, res: Response) => {
-  res.status(500).json({
-    status: 'Error',
-    meesage: 'This route is not yet defined',
-  });
+export const getMe = (req: Request, res: Response, next: NextFunction) => {
+  req.params.id = req.user.id;
+  next();
 };
 
-export const updateUser = (req: Request, res: Response) => {
-  res.status(500).json({
-    status: 'Error',
-    meesage: 'This route is not yet defined',
-  });
-};
+// Filtering example: {{URL}}api/v1/users?role=user
+export const getAllUsers = factory.getAll(User);
+
+export const getUser = factory.getOne(User);
+// Only for admins and data that is not password
+export const updateUser = factory.updateOne(User);
 
 export const deleteUser = factory.deleteOne(User);

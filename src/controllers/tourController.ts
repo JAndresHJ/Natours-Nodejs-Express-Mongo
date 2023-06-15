@@ -1,9 +1,8 @@
 import { NextFunction, Request, Response } from 'express';
 import Tour from '../models/tourModel';
-import APIFeatures from '../utils/apiFeatures';
 import { catchAsync } from '../utils/catchAsync';
-import AppError from '../utils/appError';
 import factory from './handlerFactory';
+import AppError from '../utils/appError';
 
 export const aliasTopTours = async (
   req: Request,
@@ -18,107 +17,17 @@ export const aliasTopTours = async (
 };
 
 // Route Handlers
-export const getAllTours = catchAsync(async (req: Request, res: Response) => {
-  // EXECUTE QUERY
-  const features = new APIFeatures(Tour.find(), req.query)
-    .filter()
-    .sort()
-    .limitFields()
-    .paginate();
+// Example of sorting and filter:
+// {{URL}}api/v1/tours?duration[gte]=10&sort=price
+export const getAllTours = factory.getAll(Tour);
 
-  const tours = await features.query;
-  /*     const tours = await Tour.find()
-      .where('duration')
-      .equals(5)
-      .where('difficulty')
-      .equals('easy'); */
+export const getTour = factory.getOne(Tour, { path: 'reviews' });
 
-  res.status(200).json({
-    status: 'success',
-    requestedAt: req.requestTime,
-    results: tours.length,
-    data: {
-      tours,
-    },
-  });
-});
+export const createTour = factory.createOne(Tour);
 
-export const getTour = catchAsync(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const { id } = req.params;
-    const tour = await Tour.findById(id).populate('reviews');
-    // Tour.findOne({ _id: id }) it is the same like findBy()
-
-    if (!tour) {
-      const err = new AppError('No tour found with that ID', 404);
-
-      return next(err);
-    }
-
-    res.status(200).json({
-      status: 'success',
-      data: {
-        tour,
-      },
-    });
-  }
-);
-
-export const createTour = catchAsync(async (req: Request, res: Response) => {
-  const { body } = req;
-  const newTour = await Tour.create(body);
-  // Equals: const newTour = new Tour({ });
-  // newTour.save()
-
-  res.status(201).json({
-    status: 'success',
-    data: {
-      tours: newTour,
-    },
-  });
-});
-
-export const updateTour = catchAsync(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const tour = await Tour.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
-
-    if (!tour) {
-      const err = new AppError('No tour found with that ID', 404);
-
-      return next(err);
-    }
-
-    res.status(200).json({
-      status: 'success',
-      data: {
-        tour,
-      },
-    });
-  }
-);
+export const updateTour = factory.updateOne(Tour);
 
 export const deleteTour = factory.deleteOne(Tour);
-
-/* export const deleteTour = catchAsync(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const tour = await Tour.findByIdAndDelete(req.params.id);
-
-    if (!tour) {
-      const err = new AppError('No tour found with that ID', 404);
-
-      return next(err);
-    }
-
-    // 204 = No Content
-    res.status(204).json({
-      status: 'success',
-      data: null,
-    });
-  }
-); */
 
 export const getTourStats = catchAsync(async (req: Request, res: Response) => {
   const stats = await Tour.aggregate([
@@ -202,6 +111,89 @@ export const getMonthlyPlan = catchAsync(
       status: 'success',
       data: {
         plan,
+      },
+    });
+  }
+);
+
+// With QUERY STRINGS = /tours-within?distance=233&latlng=40,45&unit=mi
+// With PARAMS = /tours-within/233/latlng/-40,45/unit/mi
+export const getToursWithin = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { distance, latlng, unit } = req.params;
+    const [lat, lng] = latlng.split(',');
+
+    if (!lat || !lng) {
+      return next(
+        new AppError(
+          'Please provide latitude and longitude in the format lat,lng',
+          400
+        )
+      );
+    }
+
+    // Distance in radians use the units
+    const radius =
+      unit === 'mi' ? Number(distance) / 3963.2 : Number(distance) / 6378.1;
+
+    // Geospatial Query
+    const tours = await Tour.find({
+      startLocation: { $geoWithin: { $centerSphere: [[lng, lat], radius] } },
+    });
+
+    res.status(200).json({
+      status: 'sucess',
+      results: tours.length,
+      data: {
+        data: tours,
+      },
+    });
+  }
+);
+
+export const getDistances = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { latlng, unit } = req.params;
+    const [lat, lng] = latlng.split(',');
+
+    if (!lat || !lng) {
+      return next(
+        new AppError(
+          'Please provide latitude and longitude in the format lat,lng',
+          400
+        )
+      );
+    }
+
+    const multiplier = unit === 'mi' ? 0.000621371 : 0.001;
+
+    // Calculating distances with the aggregation pipeline
+    const distances = await Tour.aggregate([
+      {
+        // In geospatial $geoNear is always the first stage
+        // That's why the aggregation Tour middleware is commented out.
+        $geoNear: {
+          near: {
+            type: 'Point',
+            coordinates: [Number(lng), Number(lat)],
+          },
+          distanceField: 'distance',
+          distanceMultiplier: multiplier,
+        },
+      },
+      {
+        // Which feels we want to keep
+        $project: {
+          distance: 1,
+          name: 1,
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        data: distances,
       },
     });
   }

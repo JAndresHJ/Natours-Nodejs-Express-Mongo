@@ -70,6 +70,8 @@ const toursSchema = new Schema<TourDoc>(
       default: 4.5,
       min: [1, 'Rating must be above 1.0'],
       max: [5, 'Raiting must be below 5.0'],
+      // Will run each time a new ratingAverga value is updated
+      set: (value: number) => Math.round(value * 10) / 10, // 4.6666, 46.666, 47, 4.7
     },
     ratingsQuantity: {
       type: Number,
@@ -157,6 +159,14 @@ const toursSchema = new Schema<TourDoc>(
   }
 );
 
+// Sort in ascending order -1 for descending
+// Only apply indexes based on query patterns, fields
+// that are constantly requested.
+// Compound index
+toursSchema.index({ price: 1, ratingsAverage: -1 });
+toursSchema.index({ slug: 1 });
+toursSchema.index({ startLocation: '2dsphere' }); // Needed for use geospatial queries
+
 /**
  * Virtual properties can be useful to create properties
  * derived from the fields i.e convert Miles to Kilometers
@@ -233,14 +243,14 @@ toursSchema.post<Query<TourAttrs, TourDoc>>(/^find/, function (docs, next) {
 
 // AGGREGATION Middleware: Allows to add hooks before or
 // after an agreggation happens.
-toursSchema.pre<Aggregate<TourDoc>>('aggregate', function (next) {
+/* toursSchema.pre<Aggregate<TourDoc>>('aggregate', function (next) {
   this.pipeline().unshift({
     $match: { secretTour: { $ne: true } },
   });
 
   next();
 });
-
+ */
 const Tour = mongoose.model<TourDoc>('Tour', toursSchema);
 
 export default Tour;

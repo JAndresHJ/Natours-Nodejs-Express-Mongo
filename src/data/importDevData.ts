@@ -2,6 +2,8 @@ import * as dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import fs from 'fs';
 import Tour from '../models/tourModel';
+import User from '../models/userModel';
+import ReviewModel from '../models/reviewModel';
 
 dotenv.config({ path: `${__dirname}/../../.env` });
 
@@ -15,12 +17,20 @@ mongoose.connect(DB!).then(() => console.log('DB Connection Successful'));
 // READ JSON FILE
 
 const tours = JSON.parse(fs.readFileSync(`${__dirname}/tours.json`, 'utf-8'));
+const users = JSON.parse(fs.readFileSync(`${__dirname}/users.json`, 'utf-8'));
+const reviews = JSON.parse(
+  fs.readFileSync(`${__dirname}/reviews.json`, 'utf-8')
+);
 
 // IMPORT DATA INTO DB
 
 const importData = async () => {
   try {
     await Tour.create(tours);
+    // pass for all user: test1234
+    await User.create(users, { validateBeforeSave: false });
+    await ReviewModel.create(reviews);
+
     console.log('Data successfully loaded!');
   } catch (err) {
     console.log(err);
@@ -34,6 +44,8 @@ const deleteData = async () => {
   try {
     // If no parameters are passed, it'll delete everything
     await Tour.deleteMany();
+    await User.deleteMany();
+    await ReviewModel.deleteMany();
     console.log('Data successfully deleted!');
   } catch (error) {
     console.log(error);
